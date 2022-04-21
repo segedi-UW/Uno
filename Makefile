@@ -1,4 +1,4 @@
-CFLAGS= -Wall -g -pthread
+CFLAGS= -Wall -g
 LIBS=cards.c agLinkedList.c agUtil.c agLLIterator.c agLLNode.c agString.c online.c
 
 uno : uno.c $(LIBS)
