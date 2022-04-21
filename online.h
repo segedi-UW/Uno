@@ -1,19 +1,27 @@
 #ifndef ONLINE_H
 #define ONLINE_H
-#include <netinet/in.h>
-#include "agLinkedList.h"
 
 #define PACKET_DATAN (256 - sizeof(enum Command))
 
-enum Command {
-	DISPLAY, RESPONSE, EXIT
-};
+#include "agLinkedList.h"
+
+#if defined(_WIN32) || defined(__CYGWIN)
+#include <winsock2.h>
+
+#elif  defined(__linux__)
+#include <netinet/in.h>
+#endif
+
 
 struct Connection {
 	int id;
 	int sock;
 	struct sockaddr_in addr;
-	socklen_t len;
+	long len;
+};
+
+enum Command {
+	DISPLAY, RESPONSE, EXIT
 };
 
 struct Packet {

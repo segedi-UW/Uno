@@ -4,6 +4,12 @@ LIBS=cards.c agLinkedList.c agUtil.c agLLIterator.c agLLNode.c agString.c online
 uno : uno.c $(LIBS)
 	@gcc -o uno uno.c $(CFLAGS) $(LIBS)
 
+uno-force :
+	@gcc -o uno uno.c $(CFLAGS) $(LIBS)
+
+uno-fwin :
+	@gcc -o uno uno.c $(CFLAGS) $(LIBS) -lws2_32
+
 uno-more : uno.c $(LIBS)
 	clear
 	@gcc -o uno uno.c $(CFLAGS) $(LIBS) 2>&1 >/dev/null | more -30

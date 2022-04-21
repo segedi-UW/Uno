@@ -20,6 +20,36 @@
 #define NO_PLAY_ON_DRAW false
 #define PLAYERN 10
 
+#if defined(_WIN32) || defined(__CYGWIN__)
+
+#define ALLOC_GETLINE 128
+ssize_t getline(char **lineptr, size_t *n, FILE *stream) 
+{
+	if (*lineptr == NULL) 
+	{
+		*lineptr = malloc(ALLOC_GETLINE);
+		if (lineptr == NULL) return -1;
+		*n = ALLOC_GETLINE;
+	} 
+	else if (n <= 0) return -1;
+
+	int count = 0;
+	for (char c; (c = fgetc(stream)) != EOF && c != '\n'; count++)
+	{
+		if (count >= *n - 1)
+		{
+			*n *= 2;
+			*lineptr = realloc(*lineptr, *n);
+			if (*lineptr == NULL) return -1;
+		}
+
+	}
+	(*lineptr)[count] = '\0';
+	return (ssize_t) count;
+}
+
+#endif
+
 typedef struct UnoPlayer {
 	unsigned char id;
 	unsigned char isBot;
