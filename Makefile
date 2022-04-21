@@ -1,7 +1,10 @@
-CFLAGS= -Wall -g -pthread
+CFLAGS= -Wall -g
 LIBS=cards.c agLinkedList.c agUtil.c agLLIterator.c agLLNode.c agString.c online.c
 
 uno : uno.c $(LIBS)
+	@gcc -o uno uno.c $(CFLAGS) $(LIBS)
+
+uno-more : uno.c $(LIBS)
 	clear
 	@gcc -o uno uno.c $(CFLAGS) $(LIBS) 2>&1 >/dev/null | more -30
 
