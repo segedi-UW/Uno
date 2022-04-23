@@ -79,8 +79,8 @@ static void multiHandle(struct Packet *p) {
 	if (multiOnline(connections, p) < 0) {
 		agLinkedList *lost = multiLost();
 		agLLIterator *it, *cit; 
-			cit = agLLIInit(lost);
-			it = agLLIInit(players);
+		cit = agLLIInit(lost);
+		it = agLLIInit(players);
 		struct Connection *c, *rc;
 		UnoPlayer *player;
 		while (agLLIHasNext(cit)) {
@@ -206,6 +206,10 @@ static void playOnline(char *name) {
 	fd_set rfds, wfds, efds;
 	size_t bufn = 512;
 	char *buf = malloc(bufn);
+	if (buf == NULL) {
+		perror("malloc()");
+		exit(EXIT_FAILURE);
+	}
 	int ready = -1, isHostReading = 0;
 
 	do {
@@ -221,21 +225,22 @@ static void playOnline(char *name) {
 				continue; // continues to read if needed
 				// reads have higher priority than writes
 			}
+
 			if (FD_ISSET(c->sock, &wfds)) {
 				isHostReading = true;
 				FD_CLR(c->sock, &wfds);
 			}
+
 			if (FD_ISSET(fileno(stdin), &rfds)) {
 				getline(&buf, &bufn, stdin);
 				if (isHostReading) {
-					puts(ANSI(ANSI_ERASE_DISP_BEG) ANSI_CURSOR_POS_ABS("0","0"));
 					isHostReading = false;
 					// only send input when wanted
 					p.cmd = RESPONSE;
 					agStrntcpy(p.data, buf, bufn);
 					if ((uniOnline(c, &p)) <= 0) handleLostClient();
 				}
-			} 
+			}
 		}
 
 		FD_SET(c->sock, &rfds);
@@ -244,7 +249,7 @@ static void playOnline(char *name) {
 		FD_SET(c->sock, &efds);
 		FD_SET(fileno(stdin), &rfds); // for user input
 
-		t.tv_sec = 15;
+		t.tv_sec = 5;
 		t.tv_usec = 0;
 	} while ((ready = select(maxfd, &rfds, &wfds, &efds, &t)) >= 0);
 
@@ -421,6 +426,11 @@ static UnoCard *play(UnoPlayer *p) {
 			return NULL;
 		errno = 0;
 		ind = strtol(buf, &strErr, 10);
+		if (*buf == '\0' || *strErr != '\0') {
+			displayPlayer(p, "User input was not a number: %c\n", *strErr);
+			continue;
+		}
+
 		if (errno != 0) {
 			perror("User input was invalid");
 			ind = -1;
@@ -447,7 +457,7 @@ static UnoCard *play(UnoPlayer *p) {
 	return choice;
 }
 
-static void playCard(UnoPlayer *p, UnoCard *c) {
+static UnoCard *playCard(UnoPlayer *p, UnoCard *c) {
 	// remove from deck
 	int rgby[4] = {0};
 	agLLIterator *it = agLLIInit(p->deck);
@@ -517,6 +527,7 @@ static void playCard(UnoPlayer *p, UnoCard *c) {
 	display("%s played a %s\n", p->name, cStr);
 	free(cStr);
 	agLLPush(discard, c, sizeof(UnoCard));
+	return c;
 }
 
 static UnoCard *drawCard(UnoPlayer *p, int canPlay) {
@@ -537,10 +548,8 @@ static UnoCard *drawCard(UnoPlayer *p, int canPlay) {
 
 	UnoCard *pCard = agLLPop(deck);
 	if (canPlay && isPlayable(agLLPeek(discard), pCard)) {
-		if (p->isBot) {
-			playCard(p, pCard);
-			return pCard;
-		}
+		if (p->isBot)
+			return playCard(p, pCard);
 		size_t bufn = 32;
 		char *buf = malloc(bufn);
 		if (buf == NULL) {
@@ -555,12 +564,11 @@ static UnoCard *drawCard(UnoPlayer *p, int canPlay) {
 		rp = strchr(buf, '\n');
 		if (rp == NULL) return NULL;
 		else *rp = '\0';
-			if (strpbrk(buf, "yY") != NULL)
-				playCard(p, pCard);
-			else return NULL;
-	}
-	else insertCard(p, pCard);
-	return pCard;
+		if (strpbrk(buf, "yY") != NULL)
+			return playCard(p, pCard);
+	} else insertCard(p, pCard);
+		
+	return NULL;
 }
 
 static int wrapStep(int x, int s, int max) {
@@ -690,7 +698,7 @@ static void startGame(int rounds) {
 
 			if (p->deck->size == 1) {
 				display(ANSI2(ANSI_FG_RED, "%s: 'UNO!'\n"), p->name);
-				displayPlayer(p, ANSI(ANSI_ERASE_LN_BK) ANSI_CURSOR_COL_ABS("0") ANSI2(ANSI_FG_GREEN, "%s: 'UNO!'\n" ), p->name);
+				displayPlayer(p, ANSI_CURSOR_UP("1") ANSI(ANSI_ERASE_LN_BK) ANSI_CURSOR_COL_ABS("0") ANSI2(ANSI_FG_GREEN, "%s: 'UNO!'\n" ), p->name);
 			}
 
 			switch(pCard->type) {
@@ -738,11 +746,13 @@ static void startGame(int rounds) {
 		}
 		agLLIFree(it);
 		// wait for continue
-		char *trash = malloc(40);
-		size_t ti = 0;
+		size_t ti = 40;
+		char *trash = malloc(ti);
 		display("Awaiting host to continue...\n");
 		printf("Press <ENTER> to continue\n");
 		getline(&trash, &ti, stdin);
+		if (r < rounds)
+			display(ANSI(ANSI_ERASE_DISP_ALL) "Round " ANSI2(ANSI_FG_CYAN, "%d!"), r);
 	}
 
 	struct Packet packet;
@@ -905,7 +915,8 @@ int main(int argc, char *argv[]) {
 	}
 
 	if (gameN <= 1) {
-		puts("Can't play a game solo unfortunately! Add some bots if you need to with the -b option.");
+		puts("Can't play a game solo unfortunately! Add some bots if you need to with the -b <# bots> option.");
+		return 1;
 	}
 
 	startGame(rounds);
