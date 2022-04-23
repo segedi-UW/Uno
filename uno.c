@@ -212,6 +212,10 @@ static void playOnline(char *name) {
 	}
 	int ready = -1, isHostReading = 0;
 
+	FD_ZERO(&rfds);
+	FD_ZERO(&wfds);
+	FD_ZERO(&efds);
+
 	do {
 		if (ready > 0) {
 			if (FD_ISSET(c->sock, &efds)) {

@@ -112,6 +112,11 @@ int hostOnline(int maxN, agLinkedList *connections, void (*handle)()) {
 
 	struct Connection c;
 	agLLIterator *cit = agLLIInit(connections);
+
+	FD_ZERO(&rfds);
+	FD_ZERO(&wfds);
+	FD_ZERO(&efds);
+
 	do  {
 		if (ready > 0) {
 			if (FD_ISSET(fileno(stdin), &rfds)) {
