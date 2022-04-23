@@ -16,3 +16,7 @@ dj :
 
 dh :
 	gdb --args ./uno AJ -m -b 0
+
+clean :
+	rm -f ./uno
+	rm -f *.o

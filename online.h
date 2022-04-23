@@ -3,7 +3,7 @@
 #include <netinet/in.h>
 #include "agLinkedList.h"
 
-#define PACKET_DATAN (256 - sizeof(enum Command))
+#define PACKET_DATAN (1024 - sizeof(enum Command))
 
 enum Command {
 	DISPLAY, RESPONSE, EXIT
