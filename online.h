@@ -21,7 +21,7 @@ struct Packet {
 	char data[PACKET_DATAN];
 };
 
-int hostOnline(int maxN, agLinkedList *c, void (*handle)());
+int hostOnline(int maxN, agLinkedList *c, int port, void (*handle)());
 int joinOnline(agLinkedList *clist, char *ip, int port);
 int multiOnline(agLinkedList *clist, struct Packet *p);
 agLinkedList *multiLost(void);

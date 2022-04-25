@@ -47,9 +47,22 @@
 #include "agLLIterator.h"
 #include "agAnsi.h"
 
-#define START_PORT 3543
-// 1024 + 1 is outside reserved space
-#define UNRESERVED 1025 
+#if defined(__APPLE__) || defined(__MACH__)
+void setSockopts(int sock) {
+	int val = 1;
+	if (setsockopt(sock, SOL_SOCKET, SO_NOSIGPIPE, (void*val), sizeof(val)) < 0)
+		perror("setsockopt()");
+}
+#else
+void setSockopts(int sock) {
+	return;
+}
+#endif
+
+
+// < 1025 are reserved ports
+#define UNRESERVED_MIN 1025 
+#define MAX_PORT 65535
 
 int servSock;
 struct sockaddr_in servAddr;
@@ -65,15 +78,22 @@ static void initOnline(void) {
 	lost = agLLInit();
 }
 
-int hostOnline(int maxN, agLinkedList *connections, void (*handle)()) {
+int hostOnline(int maxN, agLinkedList *connections, int port, void (*handle)()) {
 	int bindStatus;
-	int port = START_PORT;
 	int maxfd = 1;
 	int ready = -1; // set to non zero to not print timeout msg
 	fd_set rfds;
 	fd_set wfds;
 	fd_set efds;
 	struct timeval t;
+
+	if (port < UNRESERVED_MIN) {
+		printf("The port %d is reserved (0-1024)\n", port);
+		return -1;
+	} else if (port > MAX_PORT) {
+		printf("The port %d is above the max port %d\n", port, MAX_PORT);
+		return -1;
+	}
 
 	initOnline();
 
@@ -89,7 +109,7 @@ int hostOnline(int maxN, agLinkedList *connections, void (*handle)()) {
 
 	// bind port
 	while ((bindStatus = bind(servSock, (struct sockaddr *) &servAddr, sizeof(struct sockaddr_in))) == -1) {
-		port = (rand() % 3000) + UNRESERVED; 
+		port = (rand() % 3000) + UNRESERVED_MIN; 
 		servAddr.sin_port = htons(port);
 	}
 	if (bindStatus < 0) return -1;
@@ -129,11 +149,14 @@ int hostOnline(int maxN, agLinkedList *connections, void (*handle)()) {
 				if ((c.sock = accept(servSock, (struct sockaddr *) &(c.addr), &acptlen)) >= 0) {
 					c.id = connections->size;
 					c.len = acptlen;
+					setSockopts(c.sock); // used for MAC which does not support MSG_NOSIGNAL
+
 					if (c.sock >= maxfd - 1) maxfd = c.sock + 1;
 					if (rcvOnline(&c, &p) <= 0) handleError("rcv()");
+
 					printf(
-						ANSI(ANSI_ERASE_LN_ALL) ANSI_CURSOR_COL_ABS("0") ANSI2(ANSI_FG_CYAN, "%s") " has joined the game!\n"
-						"Press " ANSI2(ANSI_FG_YELLOW, "<ENTER>") " to stop accepting players"
+							ANSI(ANSI_ERASE_LN_ALL) ANSI_CURSOR_COL_ABS("0") ANSI2(ANSI_FG_CYAN, "%s") " has joined the game!\n"
+							"Press " ANSI2(ANSI_FG_YELLOW, "<ENTER>") " to stop accepting players"
 							, p.data);
 					fflush(stdout);
 					agLLPush(connections, &c, sizeof(c));
@@ -217,13 +240,16 @@ int uniOnline(const struct Connection *c, struct Packet *p) {
 	int tsent = 0;
 	memcpy(buffer, p, psize);
 	while (tsent < psize) {
+#if defined(__APPLE__) || defined(__MACH__)
+		sent = send(c->sock, buffer + tsent, psize - tsent, 0);
+#else
 		sent = send(c->sock, buffer + tsent, psize - tsent, MSG_NOSIGNAL);
+#endif
 		if (sent <= 0) return sent;
 		tsent += sent;
 	}
 	return tsent;
 }
-
 
 
 int rcvOnline(const struct Connection *c, struct Packet *p) {
