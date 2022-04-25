@@ -181,7 +181,7 @@ int joinOnline(agLinkedList *clist, char *ip, int port) {
 		handleError("socket()");
 
 	c.addr.sin_family = AF_INET;
-	c.addr.sin_addr.s_addr = htonl(INADDR_ANY);
+	if (inet_aton(ip, &c.addr.sin_addr) < 0) printf("Invalid ip format\n");
 	c.addr.sin_port = htons(port);
 
 	if (connect(c.sock, (struct sockaddr *) &(c.addr), sizeof(struct sockaddr_in)))
