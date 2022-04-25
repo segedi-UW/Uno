@@ -867,15 +867,14 @@ int main(int argc, char *argv[]) {
 				break;
 			case 'j':
 				isClient = true;
+				agStrntcpy(ip, optarg, sizeof(ip));
+				break;
+			case 'p':
 				port = atoi(optarg);
 				if (port < 1) {
 					printf("Port needs to be > 0. Ports should always be above 1024.");
 					return EXIT_FAILURE;
 				}
-				break;
-			case 'i':
-				agStrntcpy(ip, optarg, sizeof(ip));
-				break;
 			default:
 				printf("Unexpected option: %c\n", optopt);
 				return EXIT_FAILURE;
