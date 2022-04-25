@@ -16,9 +16,11 @@
 #include "online.h"
 #include "agAnsi.h"
 
+#define START_PORT 3543
 #define PLAY_ON_DRAW true
 #define NO_PLAY_ON_DRAW false
 #define PLAYERN 10
+#define LOG_FILE ".uno.log"
 
 typedef struct UnoPlayer {
 	unsigned char id;
@@ -36,6 +38,7 @@ static char isBotDelay = true;
 static int player_id = 0;
 static agLinkedList *connections;
 static agLinkedList *players;
+static int isServe = false;
 
 static void handleLost(UnoPlayer *p) {
 	display("Lost connection to %s!\n", p->name);
@@ -119,6 +122,8 @@ static void display(const void *f, ...) {
 	vsnprintf(p.data, sizeof(p.data), f, ap);
 	if (!agLLIsEmpty(connections))
 		multiHandle(&p);
+
+	if (isServe) return;
 
 	va_start(ap, f);
 	vprintf(f, ap);
@@ -769,7 +774,7 @@ static void startGame(int rounds) {
 		printf("Press <ENTER> to continue\n");
 		getline(&trash, &ti, stdin);
 		if (r < rounds)
-			display(ANSI(ANSI_ERASE_DISP_ALL) "Round " ANSI2(ANSI_FG_CYAN, "%d!"), r + 1);
+			display(ANSI(ANSI_ERASE_DISP_DEL) ANSI_CURSOR_POS_ABS("0","0") "Round " ANSI2(ANSI_FG_CYAN, "%d!"), r + 1);
 	}
 
 	struct Packet packet;
@@ -796,7 +801,7 @@ void sigintHandler(int sigNum) {
 }
 
 int main(int argc, char *argv[]) {
-	const char *optStr = "b:hj:i:mnr:";
+	const char *optStr = "b:hp:j:mnr:s";
 	extern char *optarg;
 	extern int optind, optopt;
 	players = agLLInit();
@@ -806,12 +811,20 @@ int main(int argc, char *argv[]) {
 	int isBotDefault = true;
 	int isHost = false;
 	int isClient = false;
-	int port = 0;
+	int port = START_PORT;
 	int rounds = 3;
 	char ip[32];
 	int playerN;
 	int gameN;
 	struct Packet packet;
+
+	// redirect stderr to logfile
+	FILE *log = fopen(LOG_FILE, "w");
+	if (log == NULL) perror("Failed to open log");
+	else {
+		if (dup2(fileno(log), STDERR_FILENO) < 0)
+			perror("dup2() stderr > logfile");
+	}
 
 	while ((optret = getopt(argc, argv, optStr)) != -1) {
 		switch(optret) {
@@ -821,19 +834,20 @@ int main(int argc, char *argv[]) {
 				printf("botN=%d\n", botN);
 				break;
 			case 'h':
-				printf("Options: uno [-b: bots=int bots] [-n: no bot-delay] [-m: multiplayer host]\n"
-						"[-j: join multiplayer=int port] [-i: join multiplayer=string ip] [-r: rounds-set=int rounds]\n"
+				printf("Options: uno [-b: bots] [-n: no-bot-delay] [-m: multiplayer-host]\n"
+						"[-s: server-host] [-p: port] [-j: join-ip] [-r: rounds]\n"
 						"<name> [other players ...]\n\n"
 						"* Note that the order of the options do not matter.\n"
 						"* Player names can be a maximum of %d characters.\n"
 						"* There can be no more than %d players in a game.\n"
 						"* Bots default to 3, subtracting one bot for each additional player.\n"
 						"* There can be a max of 10 players in the game between bots and players.\n"
-						"* To host an online game, use the -m for multiplayer flag. Supply friends with the listed\n"
-						"port that is printed to output when setup to join, which they can enter by using\n"
-						"the -j option followed by the port AND the -i option followed by the ip address of the host.\n"
+						"* To host an online game, use the -m multiplayer flag. \n"
+						"To join, use the -j option followed by the ip address of the host.\n"
+						"The port is printed to output when setup to join, which by default is %d."
+						"If the port is not the default it can be specified on the client side with -p\n"
 						"* To specify the number of rounds use the -r option. Default is 3.\n"
-						, UNO_PLAYER_NAMEN, PLAYERN);
+						, UNO_PLAYER_NAMEN, PLAYERN, START_PORT);
 				return EXIT_SUCCESS;
 			case 'r':
 				rounds = atoi(optarg);
@@ -847,6 +861,10 @@ int main(int argc, char *argv[]) {
 			case 'm':
 				isHost = true;
 				break;
+			case 's':
+				isHost = true;
+				isServe = true;
+				break;
 			case 'j':
 				isClient = true;
 				port = atoi(optarg);
@@ -859,7 +877,7 @@ int main(int argc, char *argv[]) {
 				agStrntcpy(ip, optarg, sizeof(ip));
 				break;
 			default:
-				fprintf(stderr, "Unexpected option: %c\n", optopt);
+				printf("Unexpected option: %c\n", optopt);
 				return EXIT_FAILURE;
 		}
 	}
@@ -869,16 +887,17 @@ int main(int argc, char *argv[]) {
 
 	playerN =  argc - optind;
 
-	if (playerN <= 0) {
+	if (!isServe && playerN <= 0) {
 		printf("Expect: uno [-b: bots] <name> [other players ...]\n"
-				"At least one player is required\n");
+				"At least one player is required\n"
+				"Use './uno -h' for help.\n");
 		return EXIT_FAILURE;
 	}
 
 	if (isHost || isClient) {
 		// multiplayer setup
 		if (isClient && isHost) {
-			fprintf(stderr, "Cannot host and join at the same time!\n");
+			printf("Cannot host and join at the same time! Use -m XOR -j\n");
 			return EXIT_FAILURE;
 		}
 
@@ -890,7 +909,7 @@ int main(int argc, char *argv[]) {
 
 		// report the port that we are hosting on
 		// increment playerN for each person who joined
-		if ((hostOnline(PLAYERN - playerN, connections, NULL)) < 0) {
+		if ((hostOnline(PLAYERN - playerN, connections, port, NULL)) < 0) {
 			printf("There was an error setting hosting.\n");
 			return EXIT_FAILURE;
 		}
@@ -918,7 +937,7 @@ int main(int argc, char *argv[]) {
 	gameN = playerN + botN;
 
 	if (gameN > 10) {
-		fprintf(stderr, "Max of 10 players (%d) and bots (%d) total (%d)\n", playerN, botN, gameN);
+		printf("Max of 10 players (%d) and bots (%d) total (%d)\n", playerN, botN, gameN);
 		return EXIT_FAILURE;
 	}
 
