@@ -534,19 +534,23 @@ static UnoCard *playCard(UnoPlayer *p, UnoCard *c) {
 	return c;
 }
 
+static void restoreDeckFromDiscard() {
+	UnoCard *card;
+	while (!agLLIsEmpty(discard)) {
+		card = agLLPop(discard);
+		// reset Wild cards
+		if (card->type == WILD || card->type == WILD_DRAW_4) 
+			card->color = NONE;
+		agLLPush(deck, card, sizeof(UnoCard));
+		free(card);
+	}
+}
+
 static UnoCard *drawCard(UnoPlayer *p, int canPlay) {
 	// check for an empty deck
 	if (agLLIsEmpty(deck)) {
 		display("Suffling discard pile into play deck!\n");
-		UnoCard *card;
-		while (!agLLIsEmpty(discard)) {
-			card = agLLPop(discard);
-			// reset Wild cards
-			if (card->type == WILD || card->type == WILD_DRAW_4) 
-				card->color = NONE;
-			agLLPush(deck, card, sizeof(UnoCard));
-			free(card);
-		}
+		restoreDeckFromDiscard();
 	}
 
 
@@ -571,7 +575,7 @@ static UnoCard *drawCard(UnoPlayer *p, int canPlay) {
 		if (strpbrk(buf, "yY") != NULL)
 			return playCard(p, pCard);
 	} else insertCard(p, pCard);
-		
+
 	return NULL;
 }
 
@@ -749,6 +753,14 @@ static void startGame(int rounds) {
 			agLLClear(p->deck);
 		}
 		agLLIFree(it);
+
+		if (r < rounds) {
+			// restore decks
+			restoreDeckFromDiscard();
+			shuffleUnoDeck(deck);
+			deal();
+		}
+
 		// wait for continue
 		size_t ti = 40;
 		char *trash = malloc(ti);
@@ -756,7 +768,7 @@ static void startGame(int rounds) {
 		printf("Press <ENTER> to continue\n");
 		getline(&trash, &ti, stdin);
 		if (r < rounds)
-			display(ANSI(ANSI_ERASE_DISP_ALL) "Round " ANSI2(ANSI_FG_CYAN, "%d!"), r);
+			display(ANSI(ANSI_ERASE_DISP_ALL) "Round " ANSI2(ANSI_FG_CYAN, "%d!"), r + 1);
 	}
 
 	struct Packet packet;
