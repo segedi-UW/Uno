@@ -5,15 +5,6 @@ uno : uno.c $(LIBS)
 	clear
 	@gcc -o uno uno.c $(CFLAGS) $(LIBS) 2>&1 >/dev/null | more -30
 
-serve:
-	./uno -s -b $(bots)
-
-host :
-	./uno -m -b 0 $(name)
-
-join :
-	./uno -j $(ip) $(name)
-
 dj :
 	gdb --args ./uno -j 0.0.0.0 Fabs
 
