@@ -5,17 +5,23 @@ uno : uno.c $(LIBS)
 	clear
 	@gcc -o uno uno.c $(CFLAGS) $(LIBS) 2>&1 >/dev/null | more -30
 
+serve:
+	./uno -s -b $(bots)
+
 host :
-	./uno -m -b 0 AJ
+	./uno -m -b 0 $(name)
 
 join :
-	./uno -i 0.0.0.0 -j 3543 Chase
+	./uno -j $(ip) $(name)
 
 dj :
-	gdb --args ./uno -j 3543 -i 0.0.0.0 Fabs
+	gdb --args ./uno -j 0.0.0.0 Fabs
 
 dh :
 	gdb --args ./uno AJ -m -b 0
+
+log : 
+	cat .uno.log | more
 
 clean :
 	rm -f ./uno
