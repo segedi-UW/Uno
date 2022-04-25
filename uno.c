@@ -750,7 +750,8 @@ static void startGame(int rounds) {
 		UnoPlayer *p;
 		while (agLLIHasNext(it)) {
 			p = agLLINext(it);
-			agLLClear(p->deck);
+			while (!agLLIsEmpty(p->deck))
+				agLLPush(discard, agLLPop(p->deck), sizeof(UnoCard));
 		}
 		agLLIFree(it);
 
