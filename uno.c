@@ -888,9 +888,9 @@ int main(int argc, char *argv[]) {
 	playerN =  argc - optind;
 
 	if (!isServe && playerN <= 0) {
-		printf("Expect: uno [-b: bots] <name> [other players ...]\n"
-				"At least one player is required\n"
-				"Use './uno -h' for help.\n");
+		printf("Expect: uno [-%s] <name> [other players ...]\n" 
+				"At least one player is required unless using the -s option.\n"
+				"Use './uno -h' for help.\n", optStr);
 		return EXIT_FAILURE;
 	}
 
