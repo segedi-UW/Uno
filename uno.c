@@ -711,7 +711,8 @@ static void startGame(int rounds) {
 
 			if (p->deck->size == 1) {
 				display(ANSI2(ANSI_FG_RED, "%s: 'UNO!'\n"), p->name);
-				displayPlayer(p, ANSI_CURSOR_UP("1") ANSI(ANSI_ERASE_LN_BK) ANSI_CURSOR_COL_ABS("0") ANSI2(ANSI_FG_GREEN, "%s: 'UNO!'\n" ), p->name);
+				if (!p->isBot)
+					displayPlayer(p, ANSI_CURSOR_UP("1") ANSI(ANSI_ERASE_LN_BK) ANSI_CURSOR_COL_ABS("0") ANSI2(ANSI_FG_GREEN, "%s: 'UNO!'\n" ), p->name);
 			}
 
 			switch(pCard->type) {
